@@ -57,8 +57,10 @@ def generate_answer(context, question):
         temperature=0.2,  # low temp for factual answers
         messages=[
             {"role": "system", "content":
-                "Answer the question using ONLY the provided context. "
-                "Cite at least 2 source filenames. If unsure, say so."},
+                "You are an FAQ assistant. Answer using ONLY the provided context. "
+                "Be direct — state the most relevant facts. Don't ask follow-up questions. "
+                "Infer intent: e.g. 'locked out' relates to password reset. "
+                "Cite source filenames in parentheses."},
             {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"},
         ],
     )
