@@ -56,8 +56,10 @@ Add to `.cursor/mcp.json`:
 {
   "mcpServers": {
     "faq-rag": {
+      "type": "stdio",
       "command": "uv",
-      "args": ["run", "/absolute/path/to/mcp_server.py"]
+      "args": ["run", "python", "${workspaceFolder}/mcp_server.py"],
+      "envFile": "${workspaceFolder}/.env"
     }
   }
 }
