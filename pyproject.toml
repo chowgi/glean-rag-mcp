@@ -1,0 +1,20 @@
+[project]
+name = "faq-rag-mcp"
+version = "0.1.0"
+description = "A RAG system that answers questions from FAQ markdown files, exposed as an MCP tool."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "openai>=1.30.0",
+    "pymongo>=4.7.0",
+    "voyageai>=0.3.0",
+    "mcp[cli]>=1.2.0",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.hatch.build.targets.wheel]
+only-include = ["rag_core.py", "mcp_server.py", "ingest.py"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
