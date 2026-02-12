@@ -10,7 +10,7 @@ A three-stage RAG pipeline:
 2. **Retrieve** — User questions are embedded and matched against stored chunks using MongoDB `$vectorSearch` (cosine similarity)
 3. **Generate** — Top matching chunks are passed as context to an LLM, which generates a cited answer
 
-The whole thing is wrapped as an MCP tool (`ask_faq`) so any MCP-compatible client (Claude Desktop, Cursor) can call it directly.
+The whole thing is wrapped as an MCP tool (`ask_faq`) so any MCP-compatible client can call it directly.
 
 ## Architecture
 
@@ -30,38 +30,34 @@ Question → VoyageAI embed → MongoDB $vectorSearch → Top-K chunks → OpenA
 - **Chunking:** Fixed ~200 character splits. Simple and predictable for a small corpus.
 - **Retrieval:** Cosine similarity via MongoDB vector search index (HNSW). Returns top 4 chunks by default.
 - **Generation:** System prompt enforces grounded answers — no hallucination, must cite source filenames, infers intent (e.g. "locked out" → password reset).
-- **Lazy client init:** API clients connect on first query, not at server startup — so the MCP server registers tools cleanly even before calling any APIs.
+- **Lazy client init:** API clients connect on first query, not at server startup — so the MCP server registers tools cleanly before any API calls.
 
 ## How to Run
 
-### 1. Install & configure
+### 1. Configure environment
 ```bash
-pip install -r requirements.txt
 cp .env.example .env    # Add your API keys
 ```
 
 ### 2. Ingest the FAQ corpus
 ```bash
-python ingest.py
+uv run ingest.py
 ```
 
 ### 3. Test via CLI
 ```bash
-python rag_core.py
+uv run rag_core.py
 ```
 
-### 4. Run as MCP tool
-Add to your MCP client config (Claude Desktop / Cursor):
+### 4. Run as MCP tool in Cursor
+
+Add to `.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
     "faq-rag": {
-      "command": "python",
-      "args": ["/absolute/path/to/mcp_server.py"],
-      "env": {
-        "VOYAGE_API_KEY": "your-key",
-        "OPENAI_API_KEY": "your-key"
-      }
+      "command": "uv",
+      "args": ["run", "/absolute/path/to/mcp_server.py"]
     }
   }
 }
@@ -86,7 +82,7 @@ The starter used OpenAI embeddings + in-memory numpy for cosine similarity. We r
 
 - **VoyageAI instead of OpenAI embeddings** — Voyage models are purpose-built for retrieval and rank higher on search benchmarks (MTEB). Using a separate embedding provider also decouples retrieval quality from the LLM choice.
 - **MongoDB instead of numpy** — A real vector database with persistence, indexing (HNSW), and `$vectorSearch` aggregation. Data survives restarts, and the same approach scales to millions of documents without code changes.
-- **Lazy client initialization** — API clients connect on first tool call, not at import. This lets the MCP server start and register tools cleanly, even if env vars aren't set yet.
+- **Lazy client initialization** — API clients connect on first tool call, not at import. This lets the MCP server start and register tools cleanly.
 - **Kept everything else simple** — no LangChain, no caching layers, no retry logic. Clean Python with direct API calls.
 
 ## Files
