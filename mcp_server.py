@@ -27,9 +27,13 @@ def ask_faq(question: str, top_k: int = 4) -> str:
         question: Natural language question about company FAQs
         top_k: Number of chunks to retrieve (1-10, default 4)
     """
-    # MCP tools should return a string — serialise the result as JSON
-    result = ask_faq_core(question.strip(), top_k=max(1, min(top_k or 4, 10)))
-    return json.dumps(result)
+    # MCP tools must return a string — serialise the result as JSON
+    try:
+        result = ask_faq_core(question.strip(), top_k=max(1, min(top_k or 4, 10)))
+        return json.dumps(result)
+    except Exception as e:
+        # Return error as string so MCP client sees it instead of silent failure
+        return json.dumps({"error": str(e)})
 
 if __name__ == "__main__":
     mcp.run(transport="stdio")

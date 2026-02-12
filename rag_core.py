@@ -10,7 +10,7 @@ import os, json
 from pathlib import Path
 
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv(Path(__file__).parent / ".env")  # load from script dir, not cwd
 
 import voyageai
 from pymongo import MongoClient
@@ -23,10 +23,18 @@ EMBED_MODEL = os.getenv("EMBED_MODEL", "voyage-3-lite")
 LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/?directConnection=true")
 
-# --- Clients ---
-voyage = voyageai.Client(api_key=os.environ["VOYAGE_API_KEY"])
-openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-collection = MongoClient(MONGODB_URI)["glean_rag"]["faq_chunks"]
+# --- Clients (lazy init so MCP server can start even if env vars are missing) ---
+_voyage = None
+_openai_client = None
+_collection = None
+
+def _init_clients():
+    """Initialise API clients on first use. Fails fast with clear error if keys missing."""
+    global _voyage, _openai_client, _collection
+    if _voyage is None:
+        _voyage = voyageai.Client(api_key=os.environ["VOYAGE_API_KEY"])
+        _openai_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+        _collection = MongoClient(MONGODB_URI)["glean_rag"]["faq_chunks"]
 
 
 def chunk_text(text, size=CHUNK_SIZE):
@@ -46,17 +54,20 @@ def load_and_chunk_faqs(faq_dir=FAQ_DIR):
 
 def embed_texts(texts):
     """Batch embed documents using VoyageAI. Returns list of 512-dim vectors."""
-    return voyage.embed(texts, model=EMBED_MODEL, input_type="document").embeddings
+    _init_clients()
+    return _voyage.embed(texts, model=EMBED_MODEL, input_type="document").embeddings
 
 
 def embed_query(q):
     """Embed a single query. VoyageAI uses input_type to optimise for retrieval."""
-    return voyage.embed([q], model=EMBED_MODEL, input_type="query").embeddings[0]
+    _init_clients()
+    return _voyage.embed([q], model=EMBED_MODEL, input_type="query").embeddings[0]
 
 
 def generate_answer(context, question):
     """Call OpenAI to answer using only the retrieved context, citing sources."""
-    response = openai_client.chat.completions.create(
+    _init_clients()
+    response = _openai_client.chat.completions.create(
         model=LLM_MODEL,
         temperature=0.2,  # low temp for factual answers
         messages=[
@@ -76,7 +87,8 @@ def ask_faq_core(question, top_k=4):
     q_embedding = embed_query(question)
 
     # MongoDB vector search — cosine similarity, return top_k chunks
-    results = list(collection.aggregate([
+    _init_clients()
+    results = list(_collection.aggregate([
         {"$vectorSearch": {
             "index": "vector_index",
             "path": "embedding",
