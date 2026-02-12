@@ -8,6 +8,10 @@ RAG core: chunking, embedding (VoyageAI), vector store (MongoDB), generation (Op
 
 import os, json
 from pathlib import Path
+
+from dotenv import load_dotenv
+load_dotenv()
+
 import voyageai
 from pymongo import MongoClient
 from openai import OpenAI
