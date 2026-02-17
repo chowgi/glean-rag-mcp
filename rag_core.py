@@ -37,6 +37,12 @@ def _init_clients():
         _collection = MongoClient(MONGODB_URI)["glean_rag"]["faq_chunks"]
 
 
+def get_collection():
+    """Return the MongoDB collection, initialising clients if needed."""
+    _init_clients()
+    return _collection
+
+
 def chunk_text(text, size=CHUNK_SIZE):
     """Split text into fixed-size character chunks."""
     text = text.strip()

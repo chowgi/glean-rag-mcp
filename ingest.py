@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from pymongo.operations import SearchIndexModel
-from rag_core import collection, load_and_chunk_faqs, embed_texts
+from rag_core import get_collection, load_and_chunk_faqs, embed_texts
 
 # Load and chunk all FAQ markdown files
 chunks = load_and_chunk_faqs()
@@ -17,6 +17,7 @@ print(f"Chunked {len(chunks)} pieces from FAQ files")
 embeddings = embed_texts([c["text"] for c in chunks])
 
 # Clear existing data and insert fresh
+collection = get_collection()
 collection.delete_many({})
 collection.insert_many([
     {"text": c["text"], "source": c["source"], "embedding": e}
