@@ -1,18 +1,11 @@
-"""
-MCP server exposing ask_faq tool via stdio transport.
-All logic lives in rag_core.py — this is just the MCP wrapper.
-"""
+"""MCP server: exposes ask_faq tool over stdio for Cursor/other MCP clients."""
 
-import sys, os, json
+import sys, json
 from pathlib import Path
-
-# Ensure .env is loaded relative to this file (not the MCP client's cwd)
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).parent / ".env")
-
-# Redirect stderr to a log file so MCP client doesn't swallow errors silently
-log_path = Path(__file__).parent / "mcp_debug.log"
-sys.stderr = open(log_path, "a")
+load_dotenv(Path(__file__).parent / ".env")  # so server has API keys when run by MCP host
+# Log errors to file; otherwise MCP host may hide stderr
+sys.stderr = open(Path(__file__).parent / "mcp_debug.log", "a")
 
 from mcp.server.fastmcp import FastMCP
 from rag_core import ask_faq_core
@@ -21,19 +14,13 @@ mcp = FastMCP("faq-rag")
 
 @mcp.tool()
 def ask_faq(question: str, top_k: int = 4) -> str:
-    """Answer a question from the FAQ corpus and cite at least two source files.
-
-    Args:
-        question: Natural language question about company FAQs
-        top_k: Number of chunks to retrieve (1-10, default 4)
-    """
-    # MCP tools must return a string — serialise the result as JSON
+    """Answer from FAQ corpus; cite sources. Returns JSON string (answer + sources) or error."""
     try:
+        # Clamp top_k to 1–10
         result = ask_faq_core(question.strip(), top_k=max(1, min(top_k or 4, 10)))
         return json.dumps(result)
     except Exception as e:
-        # Return error as string so MCP client sees it instead of silent failure
         return json.dumps({"error": str(e)})
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")
+    mcp.run(transport="stdio")  # Cursor talks to this process via stdin/stdout
