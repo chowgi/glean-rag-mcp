@@ -1,4 +1,4 @@
-"""RAG: chunk → embed (VoyageAI) → store/query (MongoDB) → answer (OpenAI)."""
+"""RAG query path: embed question (VoyageAI) → vector search (MongoDB) → generate answer (OpenAI). Ingestion (chunk + embed + store) lives in ingest.py."""
 
 import os, json
 from pathlib import Path
@@ -8,14 +8,11 @@ load_dotenv(Path(__file__).parent / ".env")  # load API keys and MONGODB_URI fro
 
 import voyageai
 from pymongo import MongoClient
-from pymongo.operations import SearchIndexModel
 from openai import OpenAI
 
-# --- Config (env vars so you can override without editing code) ---
-FAQ_DIR = os.getenv("FAQ_DIR", str(Path(__file__).parent / "faqs"))  # folder of .md FAQ files
-CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "200"))  # chars per chunk for embedding
-EMBED_MODEL = os.getenv("EMBED_MODEL", "voyage-3-lite")  # VoyageAI model, 512-dim output
-LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+# Config: only MONGODB_URI comes from env; model names are fixed so ingest and query use the same embedding model
+EMBED_MODEL = "voyage-3-lite"
+LLM_MODEL = "gpt-4o-mini"
 MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://localhost:27017/?directConnection=true")
 
 # Lazy-initialised clients (so MCP can start even if keys aren’t set yet)
@@ -34,22 +31,6 @@ def get_collection():
     _init()
     return _coll
 
-def chunk_text(text, size=CHUNK_SIZE):
-    """Split text into fixed-size character chunks for embedding."""
-    text = text.strip()
-    return [text[i:i+size] for i in range(0, len(text), size)]
-
-def load_and_chunk_faqs(faq_dir=FAQ_DIR):
-    """Read all .md files in faq_dir, chunk each, return list of {text, source} dicts."""
-    return [{"text": c, "source": md.name}
-            for md in sorted(Path(faq_dir).glob("*.md"))
-            for c in chunk_text(md.read_text())]
-
-def embed_texts(texts):
-    """Batch-embed strings with VoyageAI (input_type=document for long content). Returns list of 512-dim vectors."""
-    _init()
-    return _voyage.embed(texts, model=EMBED_MODEL, input_type="document").embeddings
-
 def embed_query(q):
     """Embed a single query string (input_type=query for search). Returns one 512-dim vector."""
     _init()
@@ -66,16 +47,6 @@ def generate_answer(context, question):
         ],
     )
     return r.choices[0].message.content
-
-def ensure_vector_index():
-    """Create MongoDB vector search index on field 'embedding' if it doesn’t exist (512 dims, cosine)."""
-    coll = get_collection()
-    names = [i["name"] for i in coll.list_search_indexes()]
-    if "vector_index" not in names:
-        coll.create_search_index(SearchIndexModel(
-            definition={"fields": [{"type": "vector", "path": "embedding", "numDimensions": 512, "similarity": "cosine"}]},
-            name="vector_index", type="vectorSearch",
-        ))
 
 def ask_faq_core(question, top_k=4):
     """Embed question → vector search in MongoDB → build context from top_k chunks → generate answer with OpenAI."""
