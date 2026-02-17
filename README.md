@@ -36,8 +36,9 @@ Question → VoyageAI embed → MongoDB $vectorSearch → Top-K chunks → OpenA
 
 ### 1. Configure environment
 ```bash
-cp .env.example .env    # Add your API keys
+cp .env.example .env
 ```
+Set `VOYAGE_API_KEY`, `OPENAI_API_KEY`, and `MONGODB_URI`. That’s all that’s required.
 
 ### 2. Ingest the FAQ corpus
 ```bash
@@ -90,8 +91,8 @@ The starter used OpenAI embeddings + in-memory numpy for cosine similarity. We r
 ## Files
 
 ```
-rag_core.py      # Core RAG: chunking, embedding, retrieval, generation
-mcp_server.py    # MCP server (thin wrapper around rag_core)
-ingest.py        # One-time: chunk → embed → store → create vector index
+ingest.py        # Build the index: read faqs/ → chunk → embed → store in MongoDB → ensure vector index
+rag_core.py      # Query path only: embed question → vector search → generate answer (no ingestion)
+mcp_server.py    # MCP server (exposes ask_faq, calls rag_core)
 faqs/            # FAQ markdown corpus
 ```
